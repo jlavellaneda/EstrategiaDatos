@@ -159,3 +159,5 @@ fi2t <- ctree(y ~ age + job + marital + education + default + balance + housing 
                campaign + pdays + previous + poutcome,
              data = data)
 plot(fit, main="Conditional Inference Tree for Loan Term Deposit")
+
+"http://www.sthda.com/english/wiki/chi-square-test-of-independence-in-r"
