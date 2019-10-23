@@ -1,0 +1,161 @@
+# Libraries ---------------------------------------------------------------
+library(ggplot2)
+library(cowplot)
+library(Hmisc)
+library(corrplot)
+library(PerformanceAnalytics)
+library(ggpubr)
+library(RColorBrewer)
+library(corrr)
+library(dplyr)
+library(tidyverse)
+library(magrittr)
+library(viridis)
+library(hrbrthemes)
+library(gplots)
+
+# Getting Data ------------------------------------------------------------
+data <- read.csv("bank-full.csv", header = TRUE, sep = ";")
+summary(data)
+
+# Transforming Data -------------------------------------------------------
+
+
+data$day <- as.factor(data$day)
+data$y <- as.factor(data$y)
+data <- data[-29183,]
+
+
+# Data Exploration --------------------------------------------------------
+
+# Subset numeric variables
+subset.n <- (data[sapply(data, is.numeric)])
+# Subset factor variables
+subset.f <- (data[sapply(data, is.factor)])
+
+# Standardization
+scaled.data <- scale(subset.n)
+scaled.data <- as.data.frame(scaled.data)
+
+#Boxplot
+boxplot(scaled.data[,-6], 
+        horizontal = TRUE, 
+        las = 2, 
+        notch = TRUE,
+        main = "Multiple Boxplot for Identifying Outliers",
+        col = "Salmon")
+
+
+# Exploratory Graphics ----------------------------------------------------
+
+#Campaign ~ Month ~ Marital
+
+ggplot(data, aes(fill=y, y=duration, x=loan)) + 
+  geom_bar(position="dodge", stat="identity") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle("Campaign Information") +
+  facet_wrap(~month) +
+  theme_ipsum() +
+  theme(legend.position="bottom") +
+  xlab("")
+
+#Duration ~ Loan ~ Job
+
+ggplot(data, aes(fill=y, y=duration, x=loan)) + 
+  geom_bar(position="dodge", stat="identity") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle("Duración del Contacto por Profesión y Crédito Personal") +
+  facet_wrap(~job) +
+  theme_ipsum() +
+  theme(legend.position="bottom") +
+  labs(subtitle="Duración y Experiencia Financiera", 
+       caption="1 = No
+       2 = Yes") +
+  xlab("")
+
+#Balance ~ Housing ~ Job
+
+ggplot(data, aes(fill=y, y=previous, x=housing)) + 
+  geom_bar(position="dodge", stat="identity") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle("Balance by Jobs and Housing") +
+  facet_wrap(~job) +
+  theme_ipsum() +
+  theme(legend.position="bottom") +
+  xlab("")
+
+# Correlation Matrix ------------------------------------------------------
+res <- cor(subset.n)
+round(res, 2)
+
+res2 <- rcorr(as.matrix(scaled.data))
+res2
+
+corrplot(res, type = "upper", order = "hclust", 
+         tl.col = "black", tl.srt = 45)
+
+chart.Correlation(subset.n, histogram=TRUE, pch=19)
+chart.Correlation(subset.n, boxplot=TRUE, pch=19)
+
+# Correlation Network Plot
+network_plot(correlate(res), min_cor=0.3)
+
+
+# Chi-Squared Test --------------------------------------------------------
+
+subset.f <- as.table(as.matrix(subset.f))
+balloonplot(t(subset.f), main ="Categorical Variables", xlab ="", ylab="",
+            label = FALSE, show.margins = FALSE)
+
+chisq <- chisq.test(subset.f)
+chisq
+
+# Logistic Regression -----------------------------------------------------
+
+logistic <- glm(y ~., data = data, family = "binomial")
+summary(logistic)
+
+# Plotting ----------------------------------------------------------------
+
+predicted.data <- data.frame(
+  probbility.of.y = logistic$fitted.values,
+  y = data$y)
+
+predicted.data <- predicted.data[order(predicted.data$probbility.of.y, decreasing = FALSE),]
+predicted.data$rank <- 1:nrow(predicted.data)
+
+ggplot(data = predicted.data, aes(x = rank, y = probbility.of.y)) +
+  geom_point(aes(color = y), alpha = 1, shape = 3, stroke = 0.5) +
+  xlab("Index") +
+  ylab("Predicted probability of suscribing a term deposit")
+
+
+# CART --------------------------------------------------------------------
+
+# Classification Tree with rpart
+library(rpart)
+
+# grow tree
+fit <- rpart(y ~ age + job + marital + education + default + balance + housing + contact + day + month +  duration +
+               campaign + pdays + previous + poutcome,  
+             method="class", data = data)
+
+printcp(fit) # display the results
+plotcp(fit) # visualize cross-validation results
+summary(fit) # detailed summary of splits
+
+# plot tree
+plot(fit, uniform=TRUE,
+     main="Classification Tree for Loan Term Deposit")
+text(fit, use.n=TRUE, all=TRUE, cex=.8)
+
+# create attractive postscript plot of tree
+post(fit, file = "c:/tree.ps",
+     title = "Classification Tree for Kyphosis")
+
+# Conditional Inference Tree for Kyphosis
+library(party)
+fi2t <- ctree(y ~ age + job + marital + education + default + balance + housing + contact + day + month +  duration +
+               campaign + pdays + previous + poutcome,
+             data = data)
+plot(fit, main="Conditional Inference Tree for Loan Term Deposit")
